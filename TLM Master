@@ -1,0 +1,248 @@
+#!/bin/bash
+
+#############################################################################################################################################################
+#                                                                                                                                                           #
+# Name          : TLM_Master.sh                                                                                                                             #
+#                                                                                                                                                           #
+# Purpose       : To fetch the below important information from TLM for the given Category/Agent code                                                       #
+#                                                                                                                                                           #
+#                       1) Set ID i.e. Local Account No                                                                                                     #
+#                       		Then for each Local Account No                                                                                                  #
+#			                  2) Duplicate Item check - Enabled or Disabled                                                                                       #
+#                 			3) Feed Type (Our side or Their side, Position or Cash or Trade)		                                                                #
+#                 			4) Initiation Name                                                                                                                  #
+#                 			5) Proposal  	                                                                                                                      #
+#                 			6) Validate balances - Enabled or Disabled                                                                                          #
+#                 			7) Validate sequence - Enabled or Disabled                                                                                          #
+#                 			8) Validate securities balances  - Enabled or Disabled                                                                              #
+#                 			9) Validate sequrities sequence  - Enabled or Disabled                                                                              #
+#                 			9) Output will be sent thru mail in HTML format                                                                                     #
+#                                                                                                                                                           #
+#                                                                                                                                                           #
+# Usage         : ./TLM_Master.sh    <category code>          Eg: ./TLM_Master.sh  'GMINE HK POSITION'                                                      #
+#                                                                                                                                                           #
+#                                                                                                                                                           #
+# Change Log    :       Date            Name                       Description                                                                              #
+#                       ----            ----                       -----------                                                                              #
+#                       20111001        Senthil Sundaresan         Creation     @copy rights reserved                                                       #
+#############################################################################################################################################################
+
+
+#-----------------------------------------------------------------------------------------------------------------------------------------------------------
+#                                                                     INPUT VALIDATION
+#-----------------------------------------------------------------------------------------------------------------------------------------------------------
+if [[ $# -ne 1 ]]
+then
+        echo "Usage : ./TLM_Master.sh <categrory code>"
+        exit 1
+fi
+quot="'"
+AGENTCode=$quot$1$quot
+echo $AGENTCode
+
+#-----------------------------------------------------------------------------------------------------------------------------------------------------------
+#                                                                    DATABASE VARIABLES
+#-----------------------------------------------------------------------------------------------------------------------------------------------------------
+
+SERVER=YOUR_SYBASE_SERVER
+USERNAME=YOUR_SYBASE_USERNAME
+PASSWORD=YOUR_SYBASE_PASSWORD
+ENVIRONMENT="DEVELOPMENT"
+WIDTH=9999
+SEPERATOR="|"
+
+#-----------------------------------------------------------------------------------------------------------------------------------------------------------
+#                                                                    OTHER VARIABLES
+#-----------------------------------------------------------------------------------------------------------------------------------------------------------
+
+DAT_BANK=bank.dat
+DAT_ALL=ALL.dat
+MAIL_RECIPIENTS="YOUR_MAIL_ID@ABC.com"
+MAIL_FROM="YOUR_MAIL_ID@ABC.com"
+SUBJECT="TLM Important Info for ${AGENTCode}"
+
+
+rm -f ${DAT_BANK} ${DAT_ALL}
+
+#-----------------------------------------------------------------------------------------------------------------------------------------------------------
+# 								MAIN PROGRAM STARTS HERE
+#-----------------------------------------------------------------------------------------------------------------------------------------------------------
+
+/opt/sybase/bin/isql -U${USERNAME} -P${PASSWORD} -S${SERVER} -w${WIDTH}  -n << EOQ | grep -v "^-" | grep -v "^ -" | sed -e '1d' > ${DAT_BANK}
+use TLM
+set nocount on
+select 
+	ltrim(convert(varchar(25),b.corr_acc_no)) + ";" +
+	b.local_acc_no + ";" +
+	b.agent_code
+from
+	bank b
+where
+	b.agent_code = ${AGENTCode} 
+go
+EOQ
+
+
+sed -i 's/^ *//g'  ${DAT_BANK}
+HTMLMessage="
+        <font color='5E5A80'>
+        <h3>TLM - Important Info</h3>
+        </font>
+	"
+while read line
+do
+	LOCACCNO=`echo $line | cut -d";" -f2`
+	LOCACCNO=$quot$LOCACCNO$quot
+	/opt/sybase/bin/isql -U${USERNAME} -P${PASSWORD} -S${SERVER} -w${WIDTH}  -n << EOQ | grep -v "^-" | grep -v "^ -" | sed -e '1d' > ${DAT_ALL}
+	use TLM
+	set nocount on
+	select 
+	    --A.agent_code,
+	    --A.local_acc_no, 
+	    (case when mf.check_duplicate_item = 1 then 'Enabled'
+		when mf.check_duplicate_item = 0 then 'Disabled' end)  + ";" +
+	    ltrim(rtrim(A.Initiation_Name)) + ";" +
+	    (case when mf.mlnv=0 then 'Unknown' 
+		when mf.mlnv=1 then 'Our Cash Transaction'
+		when mf.mlnv=2 then 'Their Cash Confirmation'
+		when mf.mlnv=3 then 'Their Cash Settlement'
+		when mf.mlnv=4 then 'Our Position'
+		when mf.mlnv=5 then 'Their Position'
+		when mf.mlnv=6 then 'Our Securities Transaction'
+		when mf.mlnv=7 then 'Their Securities Confirm'
+		when mf.mlnv=8 then 'Their Securities Pending'
+		when mf.mlnv=9 then 'Their Securities Problem'
+		when mf.mlnv=10 then 'Their Securities Settlement'
+		when mf.mlnv=11 then 'Our Market Transaction'
+		when mf.mlnv=12 then 'Their Market Transaction'
+		when mf.mlnv=13 then 'Our Client Transaction'
+		when mf.mlnv=14 then 'Their Client Transaction'
+		when mf.mlnv=15 then 'Our Forex Confirmation'
+		when mf.mlnv=16 then 'Agent Forex Confirmation'
+		when mf.mlnv=17 then 'Broker Forex Confirmation'
+		when mf.mlnv=18 then 'Our Option Transaction'
+		when mf.mlnv=19 then 'Their Option Transaction'
+		when mf.mlnv=20 then 'Our Forward Transaction'
+		when mf.mlnv=21 then 'Their Forward Transaction' end)  + ";" +  
+	    (case when mf.proposal_triggering=0 then 'Any matching input' 
+		when mf.proposal_triggering=1 then  'Never Propose'
+		when mf.proposal_triggering=2 then  'Always Propose'
+		when mf.proposal_triggering=3 then  'All Selected Input' end)  + ";" +
+	    mf.refmask_code + ";" +
+	    (case when mf.mlnv=1 or mf.mlnv=3 then 'bal : ' + convert(varchar(25),(case when mf.validate_balances=0 then 'Disabled'  when mf.validate_balances=1 then 'Enabled' end)) + ' - seq : ' + convert(varchar(25), (case when mf.validate_sequence=0  then 'Disabled'  when mf.validate_sequence=1 then 'Enabled' end) )  
+		  when mf.mlnv=4 or mf.mlnv=5 then 'sec_bal : ' + convert(varchar(25),(case when mf.validate_securities_balances=0 then 'Disabled'  when mf.validate_securities_balances=1 then 'Enabled' end)) + ' - sec_seq : ' + convert(varchar(25),(case when mf.validate_securities_sequence=0 then 'Disabled'  when mf.validate_securities_sequence=1 then 'Enabled' end))  
+	    end) 'validation'
+	    /*mf.validate_balances,
+	    mf.validate_securities_balances,
+	    mf.validate_securities_sequence,
+	    mf.validate_sequence*/
+	    
+	from 
+	(select 
+	    bk.corr_acc_no,
+	    (select i.name from initiation i where i.data_load_corr_acc_no in (select b.report_parm from bank b where b.agent_code = ${AGENTCode}))  'Initiation_Name',
+	    bk.agent_code,
+	    bk.local_acc_no,
+	    count(it.corr_acc_no) 'corracc_count'
+	from
+	    bank bk,
+	    item it
+	where 
+	    bk.corr_acc_no = it.corr_acc_no and
+	    it.flag_2 in (0) and
+	    bk.agent_code = ${AGENTCode}
+	)A, message_feed mf
+	where 
+	    A.corr_acc_no = mf.corr_acc_no AND
+	    A.agent_code=${AGENTCode} AND
+	    A.local_acc_no=${LOCACCNO}
+	group by 
+	    A.agent_code, 
+	    A.local_acc_no, 
+	    mf.mlnv,
+	    mf.proposal_triggering,
+	    A.corracc_count, 
+	    mf.check_duplicate_item,
+	    mf.refmask_code,
+	    mf.validate_balances,
+	    mf.validate_securities_balances,
+	    mf.validate_securities_sequence,
+	    mf.validate_sequence,
+	    (case when mf.mlnv=1 or mf.mlnv=3 then 'bal : ' + convert(varchar(25),(case when mf.validate_balances=0 then 'Disabled'  when mf.validate_balances=1 then 'Enabled' end)) + ' - seq : ' + convert(varchar(25), (case when mf.validate_sequence=0  then 'Disabled'  when mf.validate_sequence=1 then 'Enabled' end) )  
+		  when mf.mlnv=4 or mf.mlnv=5 then 'sec_bal : ' + convert(varchar(25),(case when mf.validate_securities_balances=0 then 'Disabled'  when mf.validate_securities_balances=1 then 'Enabled' end)) + ' - sec_seq : ' + convert(varchar(25),(case when mf.validate_securities_sequence=0 then 'Disabled'  when mf.validate_securities_sequence=1 then 'Enabled' end))  
+	    end) ,
+	    A.Initiation_Name
+	order by 
+	    A.local_acc_no
+	go
+	EOQ
+
+	
+	HTMLMessage="$HTMLMessage
+	<table width='500'cellspacing='2' cellpadding='2'>
+        <tr>
+        <th align='left' bgcolor='5E5A80'><font color='white'>SET ID -  ${LOCACCNO}</font></th>
+	</tr>
+	"
+	HTMLMessage="$HTMLMessage </table><br>"
+
+
+
+	HTMLMessage="$HTMLMessage
+	<table width='1200' border='3' bordercolor='5E5A80' cellspacing='2' cellpadding='2'>
+	<tr>
+	<font style="font-size:14px" color='white'>
+	<th align='center' bgcolor='5E5A80'>Duplicate Check</th>
+	<th align='center' bgcolor='5E5A80'>Initiation Name</th>
+	<th align='center' bgcolor='5E5A80'>Feed Type</th>
+	<th align='center' bgcolor='5E5A80'>Proposal</th>
+	<th align='center' bgcolor='5E5A80'>Short Code</th>
+	<th align='center' bgcolor='5E5A80'>Validation</th>
+	</font>
+	</tr>
+	"
+	sed -i 's/ *$//g' ${DAT_ALL}
+	while read LINE
+	do
+		DUPCHECK=`echo $LINE | cut -d";" -f1`
+		INITIATION=`echo $LINE | cut -d";" -f2`
+		FEEDTYPE=`echo $LINE | cut -d";" -f3`
+		PROPOSAL=`echo $LINE | cut -d";" -f4`
+		SHORTCODE=`echo $LINE | cut -d";" -f5`
+		VALIDATION=`echo $LINE | cut -d";" -f6`
+
+	        HTMLMessage="$HTMLMessage
+	        <tr>
+	        <font style="font-size:14px" color='5E5A80'>
+	        <td align=''>${DUPCHECK}</td>
+	        <td align=''>${INITIATION}</td>
+	        <td align=''>${FEEDTYPE}</td>
+	        <td align=''>${PROPOSAL}</td>
+	        <td align=''>${SHORTCODE}</td>
+	        <td align=''>${VALIDATION}</td>
+	        </font>
+	        </tr>
+	        "
+	done<${DAT_ALL}
+	HTMLMessage="$HTMLMessage </table> <hr>"
+done<${DAT_BANK}
+
+HTMLMessage="$HTMLMessage"
+
+#-----------------------------------------------------------------------------------------------------------------------------------------------------------
+#                                                                      	     MAIL 
+#-----------------------------------------------------------------------------------------------------------------------------------------------------------
+
+/usr/lib/sendmail -t <<-EOF
+Content-type: text/html
+To: ${MAIL_RECIPIENTS}
+From: ${MAIL_FROM}
+Subject: ${SUBJECT}
+$HTMLMessage
+.
+EOF
+#-----------------------------------------------------------------------------------------------------------------------------------------------------------
+#                                                                       END OF PROGRAM
+#-----------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
