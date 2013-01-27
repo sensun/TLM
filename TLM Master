@@ -7,24 +7,24 @@
 # Purpose       : To fetch the below important information from TLM for the given Category/Agent code                                                       #
 #                                                                                                                                                           #
 #                       1) Set ID i.e. Local Account No                                                                                                     #
-#                       		Then for each Local Account No                                                                                                  #
-#			                  2) Duplicate Item check - Enabled or Disabled                                                                                       #
-#                 			3) Feed Type (Our side or Their side, Position or Cash or Trade)		                                                                #
-#                 			4) Initiation Name                                                                                                                  #
-#                 			5) Proposal  	                                                                                                                      #
-#                 			6) Validate balances - Enabled or Disabled                                                                                          #
-#                 			7) Validate sequence - Enabled or Disabled                                                                                          #
-#                 			8) Validate securities balances  - Enabled or Disabled                                                                              #
-#                 			9) Validate sequrities sequence  - Enabled or Disabled                                                                              #
-#                 			9) Output will be sent thru mail in HTML format                                                                                     #
+#                       		Then for each Local Account No                                                                                      #
+#			                  2) Duplicate Item check - Enabled or Disabled                                                                     #
+#                 			3) Feed Type (Our side or Their side, Position or Cash or Trade)		                                    #
+#                 			4) Initiation Name                                                                                                  #
+#                 			5) Proposal  	                                                                                                    #
+#                 			6) Validate balances - Enabled or Disabled                                                                          #
+#                 			7) Validate sequence - Enabled or Disabled                                                                          #
+#                 			8) Validate securities balances  - Enabled or Disabled                                                              #
+#                 			9) Validate sequrities sequence  - Enabled or Disabled                                                              #
+#                 			9) Output will be sent thru mail in HTML format                                                                     #
 #                                                                                                                                                           #
 #                                                                                                                                                           #
-# Usage         : ./TLM_Master.sh    <category code>          Eg: ./TLM_Master.sh  'GMINE HK POSITION'                                                      #
+# Usage         : ./TLM_Master.sh    <category code>          Eg: ./TLM_Master.sh  'GE HK POSITION'                                                         #
 #                                                                                                                                                           #
 #                                                                                                                                                           #
 # Change Log    :       Date            Name                       Description                                                                              #
 #                       ----            ----                       -----------                                                                              #
-#                       20111001        Senthil Sundaresan         Creation     @copy rights reserved                                                       #
+#                       20111001        Senthil Sundaresan         Creation                                                                                 #
 #############################################################################################################################################################
 
 
